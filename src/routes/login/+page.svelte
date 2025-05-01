@@ -43,7 +43,6 @@
 	<div class="shape"></div>
 	<div class="shape"></div>
 	<div class="shape"></div>
-	<!-- Added the fifth circle -->
 </div>
 <form>
 	<h3>Welcome Back!</h3>

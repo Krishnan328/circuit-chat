@@ -1,6 +1,22 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { createClient } from '@supabase/supabase-js';
+	
+	// Initialize Supabase client
+	// In a real app, these would be env variables
+	const supabaseUrl = 'https://xpisgetbwxkdfevllwsq.supabase.co';
+	const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhwaXNnZXRid3hrZGZldmxsd3NxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU2ODg1NjIsImV4cCI6MjA2MTI2NDU2Mn0.IB9K5WH_13qXFLIDtLA6Q4_I8MCoiqTVRHWkrzisM-M';
+	const supabase = createClient(supabaseUrl, supabaseKey);
+	
+	// Form state
+	let fullName = '';
+	let email = '';
+	let username = '';
+	let password = '';
+	let confirmPassword = '';
+	let loading = false;
+	let errorMessage = '';
 
 	onMount(() => {
 		const shapes = document.querySelectorAll('.shape');
@@ -30,10 +46,97 @@
 		});
 	});
 
-	function handleSignup() {
-		// If signup is successful:
-		goto('/user'); // Navigate to the user page after signup
-		// Or redirect to login, verification, etc.
+	async function handleSignup() {
+		// Validation
+		if (!fullName || !email || !username || !password || !confirmPassword) {
+			errorMessage = 'All fields are required';
+			return;
+		}
+		
+		if (password !== confirmPassword) {
+			errorMessage = 'Passwords do not match';
+			return;
+		}
+		
+		// Min password length check
+		if (password.length < 6) {
+			errorMessage = 'Password must be at least 6 characters long';
+			return;
+		}
+		
+		try {
+			loading = true;
+			errorMessage = '';
+			
+			// Sign up with email and password
+			const { data, error } = await supabase.auth.signUp({
+				email,
+				password,
+				options: {
+					data: {
+						full_name: fullName,
+						username
+					}
+				}
+			});
+			
+			if (error) throw error;
+			
+			if (data?.user) {
+				// Successfully signed up
+				alert('Signup successful! Check your email for confirmation.');
+				goto('/login'); // Redirect to login page
+			}
+		} catch (error) {
+			// TypeScript type guard for error handling
+			if (error instanceof Error) {
+				errorMessage = error.message;
+			} else {
+				errorMessage = 'An unexpected error occurred';
+			}
+		} finally {
+			loading = false;
+		}
+	}
+	
+	async function signInWithGoogle() {
+		try {
+			loading = true;
+			errorMessage = '';
+			const { error } = await supabase.auth.signInWithOAuth({
+				provider: 'google'
+			});
+			
+			if (error) throw error;
+		} catch (error) {
+			if (error instanceof Error) {
+				errorMessage = error.message;
+			} else {
+				errorMessage = 'Failed to sign in with Google';
+			}
+		} finally {
+			loading = false;
+		}
+	}
+	
+	async function signInWithFacebook() {
+		try {
+			loading = true;
+			errorMessage = '';
+			const { error } = await supabase.auth.signInWithOAuth({
+				provider: 'facebook'
+			});
+			
+			if (error) throw error;
+		} catch (error) {
+			if (error instanceof Error) {
+				errorMessage = error.message;
+			} else {
+				errorMessage = 'Failed to sign in with Facebook';
+			}
+		} finally {
+			loading = false;
+		}
 	}
 </script>
 
@@ -44,33 +147,43 @@
 	<div class="shape"></div>
 	<div class="shape"></div>
 </div>
-<form>
+<form on:submit|preventDefault={handleSignup}>
 	<h3>Create Account</h3>
 
+	{#if errorMessage}
+		<div class="error-message">{errorMessage}</div>
+	{/if}
+
 	<label for="fullname">Full Name</label>
-	<input type="text" placeholder="Enter your full name" id="fullname" />
+	<input type="text" placeholder="Enter your full name" id="fullname" bind:value={fullName} />
 
 	<label for="email">Email</label>
-	<input type="email" placeholder="Enter your email" id="email" />
+	<input type="email" placeholder="Enter your email" id="email" bind:value={email} />
 
 	<label for="username">Username</label>
-	<input type="text" placeholder="Choose a username" id="username" />
+	<input type="text" placeholder="Choose a username" id="username" bind:value={username} />
 
 	<label for="password">Password</label>
-	<input type="password" placeholder="Create password" id="password" />
+	<input type="password" placeholder="Create password" id="password" bind:value={password} />
 
 	<label for="confirm-password">Confirm Password</label>
-	<input type="password" placeholder="Confirm password" id="confirm-password" />
+	<input type="password" placeholder="Confirm password" id="confirm-password" bind:value={confirmPassword} />
 
-	<button type="button" onclick={() => handleSignup()}>Sign Up</button>
+	<button type="submit" disabled={loading}>
+		{loading ? 'Signing up...' : 'Sign Up'}
+	</button>
 
 	<div class="login-link">
 		Already have an account? <a href="/login">Log In</a>
 	</div>
 
 	<div class="social">
-		<div class="go"><i class="fab fa-google"></i> Google</div>
-		<div class="fb"><i class="fab fa-facebook"></i> Facebook</div>
+		<div class="go" on:click={signInWithGoogle}>
+			<i class="fab fa-google"></i> Google
+		</div>
+		<div class="fb" on:click={signInWithFacebook}>
+			<i class="fab fa-facebook"></i> Facebook
+		</div>
 	</div>
 </form>
 
@@ -204,8 +317,23 @@
 		transition: all 0.3s ease;
 	}
 
-	button:hover {
+	button:hover:not(:disabled) {
 		background-color: #f5c2e7; /* Catppuccin Pink */
+	}
+	
+	button:disabled {
+		opacity: 0.7;
+		cursor: not-allowed;
+	}
+	
+	.error-message {
+		background-color: rgba(243, 139, 168, 0.2); /* Catppuccin Red with opacity */
+		color: #f38ba8; /* Catppuccin Red */
+		padding: 10px;
+		border-radius: 8px;
+		margin-top: 15px;
+		text-align: center;
+		font-size: 14px;
 	}
 
 	.login-link {

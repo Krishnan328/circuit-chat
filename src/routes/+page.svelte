@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
+    import { goto } from '$app/navigation';
   
     onMount(() => {
       const shapes = document.querySelectorAll('.shape');
@@ -28,6 +29,10 @@
         }, 30);
       });
     });
+
+    function handleGetStarted() {
+      goto('/signup');
+    }
   </script>
   
   <div class="background">
@@ -55,7 +60,7 @@
         Connect with teams, share resources, and collaborate in real-time in a distraction-free environment.
       </p>
       <div class="cta-buttons">
-        <button class="primary-button">Get Started</button>
+        <button onclick={() => handleGetStarted()} class="primary-button">Get Started</button>
         <button class="secondary-button">Learn More</button>
       </div>
     </section>
