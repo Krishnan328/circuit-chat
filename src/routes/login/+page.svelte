@@ -1,6 +1,19 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { createClient } from '@supabase/supabase-js';
+
+	// Initialize Supabase client
+	// In a real app, these would be env variables
+	const supabaseUrl = 'https://xpisgetbwxkdfevllwsq.supabase.co';
+	const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhwaXNnZXRid3hrZGZldmxsd3NxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU2ODg1NjIsImV4cCI6MjA2MTI2NDU2Mn0.IB9K5WH_13qXFLIDtLA6Q4_I8MCoiqTVRHWkrzisM-M';
+	const supabase = createClient(supabaseUrl, supabaseKey);
+
+	// Form state
+	let username = '';
+	let password = '';
+	let loading = false;
+	let errorMessage = '';
 
 	onMount(() => {
 		const shapes = document.querySelectorAll('.shape');
@@ -30,10 +43,82 @@
 		});
 	});
 
-	function handleLogin() {
-		// If login is successful:
-		goto('/user'); // <-- Navigate to the '/dashboard' route
-		// Or any other route like '/home', '/profile' etc.
+	async function handleLogin() {
+		// Validation
+		if (!username || !password) {
+			errorMessage = 'Username and password are required';
+			return;
+		}
+
+		try {
+			loading = true;
+			errorMessage = '';
+			
+			// Determine if username is an email or username
+			const isEmail = username.includes('@');
+			
+			// Sign in with the appropriate credentials
+			const { data, error } = await supabase.auth.signInWithPassword({
+				email: isEmail ? username : `${username}@example.com`, // Fallback for username login
+				password
+			});
+			
+			if (error) throw error;
+			
+			if (data?.user) {
+				// Successfully logged in
+				goto('/user'); // Navigate to the user page
+			}
+		} catch (error) {
+			// TypeScript type guard for error handling
+			if (error instanceof Error) {
+				errorMessage = error.message;
+			} else {
+				errorMessage = 'Invalid login credentials';
+			}
+		} finally {
+			loading = false;
+		}
+	}
+	
+	async function signInWithGoogle() {
+		try {
+			loading = true;
+			errorMessage = '';
+			const { error } = await supabase.auth.signInWithOAuth({
+				provider: 'google'
+			});
+			
+			if (error) throw error;
+		} catch (error) {
+			if (error instanceof Error) {
+				errorMessage = error.message;
+			} else {
+				errorMessage = 'Failed to sign in with Google';
+			}
+		} finally {
+			loading = false;
+		}
+	}
+	
+	async function signInWithFacebook() {
+		try {
+			loading = true;
+			errorMessage = '';
+			const { error } = await supabase.auth.signInWithOAuth({
+				provider: 'facebook'
+			});
+			
+			if (error) throw error;
+		} catch (error) {
+			if (error instanceof Error) {
+				errorMessage = error.message;
+			} else {
+				errorMessage = 'Failed to sign in with Facebook';
+			}
+		} finally {
+			loading = false;
+		}
 	}
 </script>
 
@@ -45,16 +130,34 @@
 	<div class="shape"></div>
 </div>
 <form>
-	<h3>Welcome Back!</h3>
-	<label for="username">Username</label>
-	<input type="text" placeholder="Username or Email" id="username" />
-	<label for="password">Password</label>
-	<input type="password" placeholder="Password" id="password" />
-	<button type="button" onclick={() => handleLogin()}>Log In</button>
-	<div class="social">
-		<div class="go"><i class="fab fa-google"></i> Google</div>
-		<div class="fb"><i class="fab fa-facebook"></i> Facebook</div>
-	</div>
+    <h3>Welcome Back!</h3>
+
+    {#if errorMessage}
+        <div class="error-message">{errorMessage}</div>
+    {/if}
+
+    <label for="username">Username or Email</label>
+    <input type="text" placeholder="Username or Email" id="username" bind:value={username} />
+
+    <label for="password">Password</label>
+    <input type="password" placeholder="Password" id="password" bind:value={password} />
+
+    <button type="button" disabled={loading} on:click={handleLogin}>
+        {loading ? 'Logging in...' : 'Log In'}
+    </button>
+
+    <div class="signup-link">
+        Don't have an account? <a href="/signup">Sign Up</a>
+    </div>
+
+    <div class="social">
+        <div class="go" on:click={signInWithGoogle}>
+            <i class="fab fa-google"></i> Google
+        </div>
+        <div class="fb" on:click={signInWithFacebook}>
+            <i class="fab fa-facebook"></i> Facebook
+        </div>
+    </div>
 </form>
 
 <style>
@@ -114,7 +217,9 @@
 	}
 
 	form {
-		height: 520px;
+		display: flex;                   
+  		flex-direction: column;          
+  		justify-content: space-between;  
 		width: 400px;
 		background-color: rgba(30, 30, 46, 0.75);
 		position: absolute;
@@ -186,8 +291,39 @@
 		transition: all 0.3s ease;
 	}
 
-	button:hover {
+	button:hover:not(:disabled) {
 		background-color: #f5c2e7; /* Catppuccin Pink */
+	}
+	
+	button:disabled {
+		opacity: 0.7;
+		cursor: not-allowed;
+	}
+	
+	.error-message {
+		background-color: rgba(243, 139, 168, 0.2); /* Catppuccin Red with opacity */
+		color: #f38ba8; /* Catppuccin Red */
+		padding: 10px;
+		border-radius: 8px;
+		margin-top: 15px;
+		text-align: center;
+		font-size: 14px;
+	}
+
+	.signup-link {
+		margin-top: 15px;
+		text-align: center;
+		font-size: 14px;
+	}
+
+	.signup-link a {
+		color: #b4befe; /* Catppuccin Lavender */
+		text-decoration: none;
+		font-weight: 500;
+	}
+
+	.signup-link a:hover {
+		text-decoration: underline;
 	}
 
 	.social {
